@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const { writeLog } = require('./logger');
 
 const app = express();
 const PORT = 3000;
@@ -33,6 +34,7 @@ app.post('/todos', (req, res) => {
     };
 
     todos.push(newTodo);
+    writeLog('ADD', newTodo);
     res.status(201).json(newTodo);
 });
 
@@ -48,7 +50,9 @@ app.put('/todos/:id', (req, res) => {
     }
 
     if (status && (status === 'pending' || status === 'done')) {
+        const oldStatus = todo.status;
         todo.status = status;
+        writeLog('UPDATE', { ...todo, oldStatus, newStatus: status });
     }
 
     res.json(todo);
@@ -63,8 +67,25 @@ app.delete('/todos/:id', (req, res) => {
         return res.status(404).json({ error: 'Todo not found' });
     }
 
+    const deletedTodo = todos[index];
     todos.splice(index, 1);
+    writeLog('DELETE', deletedTodo);
     res.status(204).send();
+});
+
+// GET /audit
+app.get('/audit', (req, res) => {
+    const fs = require('fs');
+    const path = require('path');
+    const logFile = path.join(__dirname, 'audit.log');
+
+    if (!fs.existsSync(logFile)) {
+        return res.json({ logs: [] });
+    }
+
+    const logContent = fs.readFileSync(logFile, 'utf-8');
+    const logs = logContent.trim().split('\n').filter(line => line.length > 0);
+    res.json({ logs });
 });
 
 app.listen(PORT, () => {
